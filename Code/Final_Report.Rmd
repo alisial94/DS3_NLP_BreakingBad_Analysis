@@ -57,22 +57,22 @@ image_read("~/DS3_NLP_BreakingBad_Analysis/Data/breaking-bad-08.jpeg")
 # Overview
 This analysis was performed as a part of MS Business Analytics course Data Science 3 (Text Analysis and Natural Language Processing with R). The code and other working files have been uploaded to my _[GitHub](https://github.com/alisial94/DS3_NLP_BreakingBad_Analysis)_, feel free check it out. The aim of this project is to use the powerful tools of NLP and produce some meaningful insights about the famous HBO TV Series - Breaking Bad. The two main analytical questions that I intend to answer with this exercise are:
 
-- *_Does the character of Jesse Pinkman becomes positive, while the character for Walter White becomes more negative as the show progresses_*
-- _*How does the topic/theme associated to each character develops/changes as the show progresses*_
+- *_Does the character of Jesse Pinkman become more positive, while the character for Walter White becomes  negative as the show progresses_*
+- _*How does the topic/theme associated to each character develop/change as the show progresses*_
 
 
 
 # Data
-If you are a fan then you would know that series has a total of 5 seasons. Unfortunately, the transcripts data available online has labels attached to each dialog until episode 6 of season 3. I exhausted all the other resources to try and get the transcript with labels for the remaining episodes, but I wasn't able to find any resource apart from few original text pdf of the screenplay. After reviewing that document before converting into text, I realsied that there where barely any dialog and those PDFs were mainly focused on setting the scene for each act, which is not what I was looking for. Therefore, I made a conscious decision to work with the data I have. 
+If you are a fan then you would know that the series has a total of 5 seasons. Unfortunately, the transcripts data available online has labels attached to each dialog until episode 6 of season 3. I exhausted all  other resources to try and get the transcript with labels for the remaining episodes, but was unable to find any resource apart from the few original text pdf of the screenplay. After reviewing that document before converting into text, I realsied that there where barely any dialogs and those PDFs were mainly focused on setting the scene for each act, which is not what I was looking for. Therefore, I made a conscious decision to work with the data I have. 
 
-The data at hand is directly scrapped from _[Forever Dreaming](https://transcripts.foreverdreaming.org/viewforum.php?f=165)_. The R script I used to scrape this data has been uploaded to my GitHub as _[scrapping_bb_data](https://github.com/alisial94/DS3_NLP_BreakingBad_Analysis/blob/main/Code/scrapping_bb_data.R)_ (please link to access it directly). The data has about 5596 dialogs (observations) in total with 5 variables which are:
+The data at hand is directly scrapped from _[Forever Dreaming](https://transcripts.foreverdreaming.org/viewforum.php?f=165)_. The R script I used to scrape this data has been uploaded to my GitHub as _[scrapping_bb_data](https://github.com/alisial94/DS3_NLP_BreakingBad_Analysis/blob/main/Code/scrapping_bb_data.R)_ (please click link to access it directly). The data has about 5596 dialogs (observations) in total with 5 variables which are:
 - actor
 - text (which is the dialog itself)
 - season 
 - episode
 - title of the episode
 
-As I mentioned that we only have two and a hlaf seasons worth of transcripts to perform this analysis, therefore, the two hypothsis stated above would still based seasons, but just the first 3. As you can see below the graphs indicate how many line there are in each episode and the charts divided based on each season.
+As  mentioned previously,  there are only have two and a half seasons worth of transcripts to perform this analysis, therefore, the two hypothesis stated above would still be based on seasons, but just the first 3. As you can see below the graphs indicate how many lines there are in each episode and the charts divided based on each season.
 
 ```{r, include=FALSE}
 # importing the data directly from github
@@ -135,7 +135,7 @@ bb_data %>%
 ```
 
 
-Now let's explore how many lines each character tends to have in the show. To mention again, I do understand that few of the main/important characters would have very less lines since there role starts developing in later half of the series. An example can be of 'Gus'. But since we have limited data so I will focus on top 10 characters in the show based on number of lines up-till mid season 3, since that the data we are working with. While I was exploring the lines per character i realised that few labels required adjustment. An example can be of that lines for 'Walter White' have been labeled as Walter and Walt so before I could get into top 10 actors, I fixed the labels. 
+Now let's explore how many lines each character tends to have in the show. To mention again, I do understand that few of the main characters would have fewer lines since there role starts to develop in the later half of the series. An example can be of 'Gus'. But since we have limited data  I will focus on top 10 characters in the show based on the number of lines up-till mid season 3, since that is the data we are working with. While I was exploring the lines per character i realised that few labels required adjustment. An example can be of that lines for 'Walter White' have been labeled as Walter and Walt so before I could get into top 10 actors, I fixed the labels. 
 ```{r, include=FALSE}
 # fixing few extra labels 
 
@@ -170,11 +170,11 @@ bb_data %>% group_by(actor) %>%
   theme_classic()
 ```
 
-Based on the graph above we see that at this point in the breaking bad series, the most important characters are Walter and Jesse and Walter's family (which includes Hank). 
+Based on the graph above we see that at this point in the breaking bad series, the most important characters are Walter,  Jesse and Walter's family (which includes Hank). 
 
 
 # Most Frequent Words
-Before moving on towards few further alterations in the dataset, I decided to have a look at the most commonly used words in the series. 
+Before moving on towards  further alterations in the dataset, I decided to have a look at the most commonly used words in the series. 
 
 ```{r, echo=F, message=F, warning=F, fig.width=10, fig.height = 4, fig.align="center"}
 
@@ -261,7 +261,7 @@ bb_data %>%
 
 ```
 
-Based on the graph above it is evident that the data we have, basically the script itself mainly uses a lot of come words which makes sense because when having a conversation you tend to use similar words. Before, I constructed this the word cloud and chart for top 20 words, I manually added few additional words to the stop words after careful consideration. One thing I realised during this exercise that most of the swear words, specially the one Jesse uses have been not included in the script, which is not very helpful because that would have helped us a lot when we move to perform sentiment analysis. But as a mentioned earlier, we have to work with what we have. 
+Based on the graph above it is evident that the data we have, basically the script itself mainly uses a lot of common words which makes sense because when having a conversation you tend to use similar words. Before, I constructed a word cloud and chart for the top 20 words, I manually added few additional words to the stop words after careful consideration. One thing I realised during this exercise is that most of the foul words, especially the one Jesse uses have been not included in the script, which is not very helpful because that would have helped us a lot when we moved on to perform sentiment analysis. But as  mentioned earlier, we have to work with what we have. 
 
 Now lets look at the most frequently used words by our top 5 actors in series i.e. Walter, Jesse, Skyler, Hank and Walter Jr. Using the same technique I have constructed individual charts that you see below for each one of them, only including the top 10 words. 
 
@@ -308,7 +308,7 @@ bb_data %>%
 
 # Unique Common Word (Tf-idf)
 
-Word count analysis that we performed above does give some insight about the most frequent words that characters have used in there lines, but to have more deep understanding of each character it's best to look at some unique words or phrases they use. In order to do so we will be using Tf-idf. Before, I begin doing this I decide to further clean the data. I decided to only keep the data for the top 5 characters since that's what we will be focusing on. 
+Word count analysis that we performed above does give some insight about the most frequent words that characters have used in there lines, but to have more deep understanding of each character it's best to look at some unique words or phrases they use. In order to do so we will be using Tf-idf. Before I begin doing this I decide to further clean the data. I decided to only keep the data for the top 5 characters since that's what we will be focusing on. 
 
 As per the chart provided below, after used the Tf-idf technique, the words that appeared are a much better representation of the character. For example, for Jesse we see words such as "Man", "Yo" and "Dude". 
 
@@ -345,7 +345,7 @@ bb_final %>%
 ```
 
 
-To even dig deeper, I decided to even explore the bigramms for the same characters which are simply the pair of two words. The second chart with bigramms paints even better picture of the unique phrases these characters have. Again, taking the example of Jesse, we can clearly see the most famous phrases that he uses were picked up during this exploration. The same is the case with Hank and if you are fan then you would know he uses "hey buddy" alot in the start of the series.
+To dig deeper, I decided to  explore the bigramms for the same characters which are simply the pair of two words. The second chart with bigramms paints even better picture of the unique phrases these characters have. Again, taking the example of Jesse, we can clearly see the most famous phrases that he uses were picked up during this exploration. The same is the case with Hank and if you are fan then you would know he uses "hey buddy" alot in the start of the series.
 
 ```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
 bb_final %>% 
@@ -376,12 +376,12 @@ bb_final %>%
 
 
 # Sentiment Analysis
-Now that we explored are data and gather a decent insight about are characters, let's swing back to the original hypothesis. In this section we will be looking at how the character changes as the show progresses. The analysis will only be focusing on the two main characters of the show as we discussed earlier and characters are Walter and Jesse. I will be using three different approaches to try and understand the sentiments. 
+Now that we explored the data and have gathered a decent insight about the characters, let's swing back to the original hypothesis. In this section we will be looking at how the character changes as the show progresses. The analysis will only be focusing on the two main characters of the show as we discussed earlier and characters are Walter and Jesse. I will be using three different approaches to try and understand the sentiments. 
 
 
 ## BING Lexicon
 
-Bing Lexicon cathegorizes the words into positives and negatives. First look at general positive and negative words associated to the character of Walter. The word cloud below depicts a very reliable and acceptable categorization of sentiments for the character. Just a side note, the cloud also shows us the character of Walter has more negative words comapred to positive. 
+Bing Lexicon categorizes the words into positives and negatives. Firstly, looking at the general positive and negative words associated to the character of Walter. The word cloud below depicts a very reliable and acceptable categorization of sentiments for the character. Just a side note, the cloud also shows us rhat the character of Walter has more negative words compared to positive. 
 
 
 ```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
@@ -475,7 +475,7 @@ tokens %>%
 ```
 
 
-I also used BING lexicon to check over all sentiment of each season for both characters. The first cord diagram below is for Walter and appears that the use of more negative words is increasing as we move from Season 1 to Season 2. One might question that since we have data for only half of the series and the amount of episodes in the Season 2 are more than compared to Season 1, thus the results are not conclusive. But when you observe closely, the weight of negative sentiments is higher compared to the weight positive sentiments is Season 2. On the hand, the in Season 1 the wights of sentiment are quite close to each other. Thus, based on these, we can say that character of Walter is becoming more negative as the show progresses. 
+I also used BING lexicon to check over all sentiments of each season for both characters. The first cord diagram below is for Walter and appears that the use of more negative words is increasing as we move from Season 1 to Season 2. One might question that since we have data for only half of the series and the amount of episodes in the Season 2 are more than compared to Season 1, thus the results are not conclusive. But when you observe closely, the weight of negative sentiments is higher compared to the weight positive sentiments is Season 2. On the other hand, in Season 1 the weights of sentiment are quite close to each other. Thus, based on these, we can say that character of Walter is becoming more negative as the show progresses. 
 
 
 
@@ -511,7 +511,7 @@ title("Relationship between Sentiment and Seasons for Walter"))
 
 ```
 
-When we look at the character of Jesse, based on cord diagram below, it appears that results far the assumption we made in the hypothesis. We believed that the character of Jesse becomes more docile as the show progresses, but as per the results in fact the character increase the weight of negative sentiments as the show progresses. In this situation, we do need more data to understand the actual change in sentiment for the character of Jesse. But now the less BING lexicon did produce promising results. 
+When we look at the character of Jesse, based on the cord diagram below, it appears that results far the assumption we made in the hypothesis. We believed that the character of Jesse becomes more docile as the show progresses, but as per the results in fact the character increase the weight of negative sentiments as the show progresses. In this situation, we do need more data to understand the actual change in sentiment for the character of Jesse. But now the less BING lexicon did produce promising results. 
 
 ```{r, echo=F, message=F, warning=F, fig.align='center'}
 # Jesse Cord Diagram by Season
@@ -556,7 +556,7 @@ The next approach to understand character development of Walter and Jesse we wil
 
 The NRC dataset used for this analysis was published in Saif M. Mohammad and Peter Turney. (2013), "Crowdsourcing a Word-Emotion Association Lexicon -  Computational Intelligence". You will need to download it in order to use it. First you will need to first download library "textdata" and when you run the code used to get nrc sentiment it will automatically ask you to download it. 
 
-Now Let's look at how these sentiments ranks fit in our data. First we look at the overall mood of the character. As you can from the graph below we get a basic idea about the frequency of each for the characters up until now in the series, but lets dig a little deeper. 
+Now Let's look at how these sentiment ranks fit in our data. First we look at the overall mood of the character. As you can see from the graph below we get a basic idea about the frequency of each for the characters up until now in the series, but lets dig a little deeper. 
 
 ```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
 nrc_sentiments <- tokens %>% 
@@ -581,7 +581,7 @@ tokens %>%
 
 ```
 
-To understand how these emotions and moods change as the season progress, I crated radar charts for each season. The radar chart below for "Walter", even with the limited data, reveals few signs of change in character. If you observe closely, you can see that moods such as sadness, fear and disgust have dropped in season 2 compared to season 1. Similarly, moods such as joy and trust have improved in season 2. If you are familiar with the series, you would know that Walter tends to be more depressed and not so confident with the illegal business he starts involving himself with. But in Season 2 we see that this business of cooking meth becomes more of routine for him and he kind's starts to taking matters in his own hands with fear of what others might do. This these facts points towards a gradual negative change in personality, which is also what we have trying to look for. 
+To understand how these emotions and moods change as the season progress, I created radar charts for each season. The radar chart below for "Walter", even with the limited data, reveals few signs of change in character. If you observe closely, you can see that moods such as sadness, fear and disgust have dropped in season 2 compared to season 1. Similarly, moods such as joy and trust have improved in season 2. If you are familiar with the series, you would know that Walter tends to be more depressed and not so confident with the illegal business he starts involving himself with. But in Season 2 we see that this business of cooking meth becomes more of routine for him and he kind's starts to taking matters in his own hands with fear of what others might do. This these facts points towards a gradual negative change in personality, which is also what we have trying to look for. 
 
 ```{r, echo=F, message=F, warning=F, fig.align='center'}
 # Table with Character, sentiment and word count
@@ -668,7 +668,7 @@ The sentiment analysis will be perfomed using Afinn Lexicon. It is similar to BI
 - -5 being the most negative
 - +5 being the most positive
 
-For this sentiment model, we will be only looking at Season 1 and Season 2, since comparing those is much easier and we have very less data on Season 3. First we look at how Walter's character performed against Afinn ranking. From the charted provide below, unfortunately we don't get much insight since the ratio of positive to negative sentiments is similar in both the seasons, therefore in case of Walter Afinn provided us with more neutral result which doesn't help understanding if the character is becoming more negative. 
+For this sentiment model, we will be only looking at Season 1 and Season 2, since comparing those is much easier and we have very less data for Season 3. First we look at how Walter's character performed against Afinn ranking. From the chart provided below, unfortunately we don't get much insight since the ratio of positive to negative sentiments is similar in both the seasons, therefore in case of Walter, Afinn provided us with a more neutral result which doesn't help understanding if the character is becoming more negative. 
 
 ```{r, echo=F, message=F, warning=F, out.width="50%"}
 
@@ -699,7 +699,7 @@ tokens %>%
 
 
 ```
-Again, when I used Afinn to understand the trend of Jesse's character, it did not produce any conclusive results. In fact, Afinn result summarize Jesse's character more negative then the two sentiment techniques we previously used. 
+Again, when I used Afinn to understand the trend of Jesse's character, it did not produce any conclusive results. In fact, Afinn results summarizes Jesse's character more negatively than the two sentiment techniques we previously used. 
 
 ```{r, echo=F, message=F, warning=F, out.width="50%"}
 
@@ -737,7 +737,7 @@ tokens %>%
 # Topic Modeling
 
 
-In this section we will briefly explore unique topics and models associated to Walter and Jesse and if these topics change as the show progresses. I used an LDA model and made it to find 5 groups/vocabularies for each season. It is very intriguing to see that the model performed pretty good in associating a theme for both the character as the show progresses. 
+In this section we will briefly explore unique topics and models associated to Walter and Jesse and if these topics change as the show progresses. I used an LDA model and made it to find 5 groups/vocabularies for each season. It is very intriguing to see that the model performed very well in associating a theme for both the character as the show progresses. 
 
 Below you can see the topic spread by seasons for Walter. It appears that this character's theme changes to completely one or more new themes. This is in some way is also validating that the possible changes in character's personality. Overall, we see that in every season Walter had a very strong association to one of the 5 top clusters.  
 ```{r, echo=F, message=F, warning=F, fig.align='center', out.width="70%"}
@@ -807,7 +807,7 @@ top_words_dtm_lda_gammas_j %>%
 ```
 
 
-I wanted to understand what these topics are so I decide to look at most frequent words in the clusters for both Walter and Jesse. Based on the graphs provided below for Walter and Jesse, the words used in the cluster are quite similar to what we initially saw as positive or negative word for each of these characters. Therefore, we can say that using LDA we did get a basic understanding that topic association to both the character does change as the show progresses. 
+I wanted to understand what these topics are so I decided to look at most the frequent words in the clusters for both Walter and Jesse. Based on the graphs provided below for Walter and Jesse, the words used in the cluster are quite similar to what we initially saw as positive or negative word for each of these characters. Therefore, we can say that using LDA we did get a basic understanding that topic association to both the character does change as the show progresses. 
 
 
 ```{r, echo=F, message=F, warning=F, fig.align='center'}
@@ -847,7 +847,7 @@ top_words_dtm_lda_j %>%
 
 # Conclusion
 
-Overall, I would say that these NLP tools are indeed very powerful and in the case of this analysis they have performed better than my exception, even for this small project with incomplete data. Yes, having more data always help, but we can not say that the analysis performed above didn't provide any meaningful insight. We were able to explore and understand both the hypothesis in depth and to some extent the hypothesis are correct because the results do suggest changes in personality of the characters as the show progresses.  
+Overall, I would say that these NLP tools are indeed very powerful and in the case of this analysis they have performed better than my expectation, even for this small project with incomplete data. Yes, having more data always help, but we can not say that the analysis performed above didn't provide any meaningful insight. We were able to explore and understand both the hypothesis in depth and to some extent the hypothesis are correct because the results do suggest changes in personality of the characters as the show progresses.  
 
 
 
