@@ -1,0 +1,856 @@
+---
+title: "Breaking Bad Text Analysis"
+author: "Ali Sial"
+date: "4/27/2022"
+output:
+  prettydoc::html_pretty:
+    toc: yes
+    number_sections: yes
+    theme: cayman
+    highlight: github
+---
+
+
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE)
+
+#### SET UP
+# It is advised to start a new session 
+# CLEAR MEMORY
+rm(list=ls())
+
+library(tidyverse)
+library(stringr)
+library(tidytext)
+library(plotly)
+library(data.table)
+library(visNetwork)
+library(igraph)
+library(sentimentr)
+library(textstem)
+library(topicmodels)
+library(prettydoc)
+library(wordcloud)
+library(wordcloud2)
+library(tm)
+library(magick)
+library(gridExtra)
+library(grid)
+library(reshape2)
+library(RColorBrewer)
+library(circlize)
+library(textdata)
+library(radarchart)
+library(knitr)
+
+
+
+```
+
+
+```{r, echo=F, message=F, warning=F, fig.width=12, fig.height = 6, fig.align="center"}
+image_read("~/DS3_NLP_BreakingBad_Analysis/Data/breaking-bad-08.jpeg")
+```
+
+
+# Overview
+This analysis was performed as a part of MS Business Analytics course Data Science 3 (Text Analysis and Natural Language Processing with R). The code and other working files have been uploaded to my _[GitHub](https://github.com/alisial94/DS3_NLP_BreakingBad_Analysis)_, feel free check it out. The aim of this project is to use the powerful tools of NLP and produce some meaningful insights about the famous HBO TV Series - Breaking Bad. The two main analytical questions that I intend to answer with this exercise are:
+
+- *_Does the character of Jesse Pinkman becomes positive, while the character for Walter White becomes more negative as the show progresses_*
+- _*How does the topic/theme associated to each character develops/changes as the show progresses*_
+
+
+
+# Data
+If you are a fan then you would know that series has a total of 5 seasons. Unfortunately, the transcripts data available online has labels attached to each dialog until episode 6 of season 3. I exhausted all the other resources to try and get the transcript with labels for the remaining episodes, but I wasn't able to find any resource apart from few original text pdf of the screenplay. After reviewing that document before converting into text, I realsied that there where barely any dialog and those PDFs were mainly focused on setting the scene for each act, which is not what I was looking for. Therefore, I made a conscious decision to work with the data I have. 
+
+The data at hand is directly scrapped from _[Forever Dreaming](https://transcripts.foreverdreaming.org/viewforum.php?f=165)_. The R script I used to scrape this data has been uploaded to my GitHub as _[scrapping_bb_data](https://github.com/alisial94/DS3_NLP_BreakingBad_Analysis/blob/main/Code/scrapping_bb_data.R)_ (please link to access it directly). The data has about 5596 dialogs (observations) in total with 5 variables which are:
+- actor
+- text (which is the dialog itself)
+- season 
+- episode
+- title of the episode
+
+As I mentioned that we only have two and a hlaf seasons worth of transcripts to perform this analysis, therefore, the two hypothsis stated above would still based seasons, but just the first 3. As you can see below the graphs indicate how many line there are in each episode and the charts divided based on each season.
+
+```{r, include=FALSE}
+# importing the data directly from github
+
+bb_data<- read.csv("https://raw.githubusercontent.com/alisial94/DS3_NLP_BreakingBad_Analysis/main/Data/BB_data.csv")
+#view(bb_data)
+
+bb_data <- bb_data %>% slice(1:5596)
+
+bb_data$season<-replace(bb_data$season, bb_data$season == 1, "Season 1") 
+bb_data$season<-replace(bb_data$season, bb_data$season == 2, "Season 2") 
+bb_data$season<-replace(bb_data$season, bb_data$season == 3, "Season 3") 
+
+
+
+bb_data <- bb_data %>% 
+  mutate(actor = as.factor(actor),
+         season = as.factor(season),
+         episode = as.factor(episode))
+```
+
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 4, fig.align="center"}
+# plots for number of lines per espisode
+
+bb_data %>% 
+  filter(season == "Season 1") %>% 
+  group_by(episode) %>% 
+  summarise(num_lines = n()) %>% 
+  ggplot(aes(as.factor(episode), num_lines)) +
+  geom_col(fill = '#0D3E10', alpha = 0.9, width = 2/3) + 
+  geom_text(aes(label = num_lines), colour = 'white', size = 4, position = position_stack(vjust = 0.5)) +
+  labs(title = "Number of lines in Season 1 by Episodes",
+       x = "Episodes", y = "Number of lines") +
+  theme_classic()
+
+bb_data %>% 
+  filter(season == "Season 2") %>% 
+  group_by(episode) %>% 
+  summarise(num_lines = n()) %>% 
+  ggplot(aes(as.factor(episode), num_lines)) +
+  geom_col(fill = "gold3", alpha = 0.9, width = 2/3) + 
+  geom_text(aes(label = num_lines), colour = 'white', size = 4, position = position_stack(vjust = 0.5)) +
+  labs(title = "Number of lines in Season 2 by Episodes",
+       x = "Episodes", y = "Number of lines") +
+  theme_classic()
+
+
+
+bb_data %>% 
+  filter(season == "Season 3") %>% 
+  group_by(episode) %>% 
+  summarise(num_lines = n()) %>% 
+  ggplot(aes(as.factor(episode), num_lines)) +
+  geom_col(fill = "black", alpha = 0.9, width = 2/3) + 
+  geom_text(aes(label = num_lines), colour = 'white', size = 4, position = position_stack(vjust = 0.5)) +
+  labs(title = "Number of lines in Season 3 by Episodes",
+       x = "Episodes", y = "Number of lines") +
+  theme_classic()
+```
+
+
+Now let's explore how many lines each character tends to have in the show. To mention again, I do understand that few of the main/important characters would have very less lines since there role starts developing in later half of the series. An example can be of 'Gus'. But since we have limited data so I will focus on top 10 characters in the show based on number of lines up-till mid season 3, since that the data we are working with. While I was exploring the lines per character i realised that few labels required adjustment. An example can be of that lines for 'Walter White' have been labeled as Walter and Walt so before I could get into top 10 actors, I fixed the labels. 
+```{r, include=FALSE}
+# fixing few extra labels 
+
+bb_data$actor <- replace(bb_data$actor, bb_data$actor == "Walt","Walter")
+bb_data$actor <- replace(bb_data$actor, bb_data$actor == "Walter(Answering Machine)","Walter")
+bb_data$actor <- replace(bb_data$actor, bb_data$actor == "Jesse(Answering Machine)","Jesse")
+bb_data$actor <- replace(bb_data$actor, bb_data$actor == "Walter Junior","Walter Jr")
+bb_data$actor <- replace(bb_data$actor, bb_data$actor == "Jane’s Voicemail","Jane")
+bb_data$actor <- replace(bb_data$actor, bb_data$actor == "Hank(on the news)","Hank")
+
+
+#bb_data %>% group_by(actor) %>% 
+#  summarize(lines = n()) %>% 
+#  arrange(desc(lines)) %>% 
+#  top_n(10)
+```
+
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 4, fig.align="center"}
+# plot for top 10 actors
+
+bb_data %>% group_by(actor) %>% 
+  summarize(lines = n()) %>% 
+  arrange(desc(lines)) %>% 
+  top_n(10) %>%
+  ggplot(aes(reorder(actor, lines), lines)) +
+  geom_col(fill = '#0D3E10', alpha = 0.9) +
+  geom_text(aes(label = lines), colour = 'white', size = 4, position = position_stack(vjust = 0.5)) +
+  labs(title = 'Number of lines by charachters (top 10)',
+       x = NULL, y = NULL) +
+  coord_flip() +
+  theme_classic()
+```
+
+Based on the graph above we see that at this point in the breaking bad series, the most important characters are Walter and Jesse and Walter's family (which includes Hank). 
+
+
+# Most Frequent Words
+Before moving on towards few further alterations in the dataset, I decided to have a look at the most commonly used words in the series. 
+
+```{r, echo=F, message=F, warning=F, fig.width=10, fig.height = 4, fig.align="center"}
+
+# removing special characters
+bb_data$text <- trimws(str_replace_all(bb_data$text, '\\[(.*?)\\]', ''))
+
+
+
+# creating a function to extract most frequent words for the series
+
+
+cleanCorpus <- function(text){
+  # punctuation, whitespace, lowercase, numbers
+  text.tmp <- tm_map(text, removePunctuation)
+  text.tmp <- tm_map(text.tmp, stripWhitespace)
+  text.tmp <- tm_map(text.tmp, content_transformer(tolower))
+  text.tmp <- tm_map(text.tmp, removeNumbers)
+  
+  # removes stopwords
+  stopwords_remove <- c(stopwords("en"), c("isnt", "dont", "thats", "youre", "hey", "hes", "didnt", "cant"))
+  text.tmp <- tm_map(text.tmp, removeWords, stopwords_remove)
+
+  return(text.tmp)
+}
+
+frequentTerms <- function(text){
+  
+  # create the matrix
+  s.cor <- VCorpus(VectorSource(text))
+  s.cor.cl <- cleanCorpus(s.cor)
+  s.tdm <- TermDocumentMatrix(s.cor.cl)
+  s.tdm <- removeSparseTerms(s.tdm, 0.999)
+  m <- as.matrix(s.tdm)
+  word_freqs <- sort(rowSums(m), decreasing = T)
+  
+  # change to dataframe
+  dm <- data.frame(word=names(word_freqs), freq=word_freqs)
+  
+  return(dm)
+}
+
+ # creating a custom pallet
+
+ w_pal = c("#0D3E10", "gold3", "black",  "#2F89A0",  "#977432", "#062D82", "#D7DBDD", "#bdc1ab", "#5d4128", "#369457")
+
+# creating word cloud
+wordcloud2(frequentTerms(bb_data$text), size=1.6, minSize = 0.9, color=w_pal, shape="diamond", fontFamily="HersheySymbol")
+
+```
+
+
+```{r, echo=F, message=F, warning=F, fig.width=8.5, fig.height = 6, fig.align="center"}
+# creating a chart for top 20 words
+
+
+stopwords_script <- tibble(word = c(stopwords("en"), c("isnt", "dont", "thats", "youre", "hey", "hes", "didnt", "cant", "right", "like", "good", "well", "fine")))
+#print(stopwords_script)
+
+
+# Create the dataframe of tokens
+bb_data %>% 
+  mutate(dialogue = as.character(bb_data$text)) %>% 
+  
+  # removes stopwords
+  unnest_tokens(word, dialogue) %>%
+  anti_join(stopwords_script, by="word") %>%
+  
+  # top 20 frequent words 
+  count(word) %>% 
+  arrange(desc(n)) %>% 
+  slice(1:20) %>% 
+  
+  
+  # the plot
+  ggplot(aes(reorder(word, n),n)) +
+  geom_col(fill = 'gold3', alpha = 0.9) +
+  geom_text(aes(label = n), color = 'white', size = 4, position = position_stack(vjust = 0.5)) +
+  labs(x="Word", y="Frequency", title="Most 20 words for the Breaking Bad") +
+  coord_flip() +
+  theme_classic() 
+
+
+
+
+```
+
+Based on the graph above it is evident that the data we have, basically the script itself mainly uses a lot of come words which makes sense because when having a conversation you tend to use similar words. Before, I constructed this the word cloud and chart for top 20 words, I manually added few additional words to the stop words after careful consideration. One thing I realised during this exercise that most of the swear words, specially the one Jesse uses have been not included in the script, which is not very helpful because that would have helped us a lot when we move to perform sentiment analysis. But as a mentioned earlier, we have to work with what we have. 
+
+Now lets look at the most frequently used words by our top 5 actors in series i.e. Walter, Jesse, Skyler, Hank and Walter Jr. Using the same technique I have constructed individual charts that you see below for each one of them, only including the top 10 words. 
+
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
+# creating a chart for top 20 words
+
+# creating a color pallet
+ bb_pal = c("Walter" = "#0D3E10", "Jesse" = "gold3", "Skyler" = "black", "Hank" = "#977432", "Walter Jr" = "#062D82", "positive" = "#0D3E10", "negative" = "gold3")
+
+
+# Create the dataframe of tokens
+bb_data %>% 
+  mutate(dialogue = as.character(bb_data$text)) %>% 
+  filter(actor %in% c("Walter","Jesse","Skyler","Hank","Walter Jr")) %>% 
+
+  # removes stopwords
+  unnest_tokens(word, dialogue) %>%
+  anti_join(stopwords_script, by="word") %>%
+  
+ # top N frequent words per character
+  count(actor, word) %>% 
+  group_by(actor) %>% 
+  arrange(desc(n)) %>% 
+  slice(1:10) %>% 
+  mutate(word2 = factor(paste(word, actor, sep="__"),
+                        levels = rev(paste(word, actor, sep="__")))) %>% 
+  
+  # the plot
+  ggplot(aes(reorder(word2, n),n)) +
+  geom_col(aes(fill = actor), show.legend = F) +
+  scale_fill_manual(values = bb_pal) +
+  facet_wrap(~actor, scales="free_y") +
+  geom_text(aes(label = n), color = 'white', size = 3, position = position_stack(vjust = 0.5)) +
+  labs(x="Word", y="Frequency", title="Most 20 words for the Breaking Bad") +
+  coord_flip() +
+  theme_classic() +
+  scale_x_discrete(labels = function(x) gsub("__.+$", "", x))
+
+
+
+```
+
+
+# Unique Common Word (Tf-idf)
+
+Word count analysis that we performed above does give some insight about the most frequent words that characters have used in there lines, but to have more deep understanding of each character it's best to look at some unique words or phrases they use. In order to do so we will be using Tf-idf. Before, I begin doing this I decide to further clean the data. I decided to only keep the data for the top 5 characters since that's what we will be focusing on. 
+
+As per the chart provided below, after used the Tf-idf technique, the words that appeared are a much better representation of the character. For example, for Jesse we see words such as "Man", "Yo" and "Dude". 
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
+
+# before we moved forward did some additional cleaning 
+bb_final<- bb_data %>% filter(actor %in% c("Walter", "Jesse", "Skyler", "Hank", "Walter Jr"))
+
+
+
+bb_final %>% 
+  group_by(actor) %>% 
+  unnest_tokens(word, text) %>% 
+  ungroup() %>% 
+  mutate(word = lemmatize_words(word)) %>% 
+  count(actor, word, sort = T) %>% 
+  ungroup() %>% 
+  bind_tf_idf(term = word, document = actor, n = n) %>% 
+  group_by(actor) %>% 
+  top_n(10, wt = tf_idf) %>%
+  ungroup() %>% 
+  mutate(word = reorder_within(word, tf_idf, actor)) %>% 
+  ggplot(aes(word, tf_idf, fill = actor)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = bb_pal) +
+  labs(title = "Typical words used by characters",
+       x = NULL, y = NULL) +
+  coord_flip() +
+  scale_x_reordered() +
+  facet_wrap(~actor, scales = 'free') +
+  theme_classic()
+
+
+```
+
+
+To even dig deeper, I decided to even explore the bigramms for the same characters which are simply the pair of two words. The second chart with bigramms paints even better picture of the unique phrases these characters have. Again, taking the example of Jesse, we can clearly see the most famous phrases that he uses were picked up during this exploration. The same is the case with Hank and if you are fan then you would know he uses "hey buddy" alot in the start of the series.
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
+bb_final %>% 
+  group_by(actor) %>% 
+  unnest_tokens(bigram, text, token = 'ngrams', n = 2) %>% 
+  ungroup() %>% 
+  separate(bigram, c('word_1', 'word_2'), sep = ' ') %>%
+  filter((!word_1 %in% stop_words$word) & 
+           (!word_2 %in% stop_words$word) & (word_1 != word_2)) %>% 
+  unite(bigram, word_1, word_2, sep = ' ') %>% 
+  count(actor, bigram, sort = T) %>% 
+  group_by(actor) %>% 
+  top_n(5, wt = n) %>% 
+  ungroup() %>% 
+  mutate(actor = as.factor(actor),
+         bigram = reorder_within(bigram, n, actor)) %>% 
+  ggplot(aes(bigram, n, fill = actor)) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = bb_pal) +
+  labs(title = "Common Phrases used by Characters",
+       x = NULL, y = NULL) +
+  coord_flip() +
+  scale_x_reordered() +
+  facet_wrap(~actor, scales = 'free') +
+  theme_classic()
+```
+
+
+
+# Sentiment Analysis
+Now that we explored are data and gather a decent insight about are characters, let's swing back to the original hypothesis. In this section we will be looking at how the character changes as the show progresses. The analysis will only be focusing on the two main characters of the show as we discussed earlier and characters are Walter and Jesse. I will be using three different approaches to try and understand the sentiments. 
+
+
+## BING Lexicon
+
+Bing Lexicon cathegorizes the words into positives and negatives. First look at general positive and negative words associated to the character of Walter. The word cloud below depicts a very reliable and acceptable categorization of sentiments for the character. Just a side note, the cloud also shows us the character of Walter has more negative words comapred to positive. 
+
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
+w_j <- bb_final %>% filter(actor %in% c("Walter", "Jesse"))
+
+# Creating our tokens
+tokens <- w_j %>% 
+  mutate(lines = as.character(w_j$text)) %>% 
+  unnest_tokens(word, lines)
+
+tokens <- tokens %>% anti_join(stopwords_script, "word")
+# word cloud for Walter's positive and negative words
+
+
+tokens %>% 
+  # append the bing sentiment and prepare the data
+  filter(actor == "Walter") %>% 
+  inner_join(get_sentiments('bing'), "word") %>%
+  count(word, sentiment, sort=T) %>% 
+  acast(word ~ sentiment, value.var = "n", fill=0) %>% 
+  
+  # wordcloud
+  comparison.cloud(colors=c("gold3", "#0D3E10"), max.words = 100)
+
+# Add a dope image on the plot
+image <- image_read("~/DS3_NLP_BreakingBad_Analysis/Data/walter.jpeg")
+grid.raster(image, x=0.85, y=0.31, height=0.47)
+
+
+
+
+
+```
+
+
+Below you can observe the word cloud created for Jesse Pinkman. We can see a lot of famous words for this character perfectly categorized in to positive and negative sentiments. Both the word cloud indeed provide us with a decent idea about the characters sentiment, to have a deeper understanding we need continue or analysis. I also checked the frequency of each of these positive and negative words, after the cloud you can see the count difference graph.
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
+
+# word cloud forJesse's positive and negative words
+
+tokens %>% 
+  # append the bing sentiment and prepare the data
+  filter(actor == "Jesse") %>% 
+  inner_join(get_sentiments('bing'), "word") %>%
+  count(word, sentiment, sort=T) %>% 
+  acast(word ~ sentiment, value.var = "n", fill=0) %>% 
+  
+  # wordcloud
+  comparison.cloud(colors=c("gold3", "#0D3E10"), max.words = 100)
+
+# Add a dope image on the plot
+image <- image_read("~/DS3_NLP_BreakingBad_Analysis/Data/jesse.jpeg")
+grid.raster(image, x=0.85, y=0.31, height=0.47)
+
+
+```
+
+
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
+
+
+# creating gg plot for frequency of most used positive and negative words by characters using Bing
+
+tokens %>% 
+  group_by(actor) %>% 
+  unnest_tokens(word, word) %>% 
+  ungroup() %>% 
+  anti_join(stopwords_script) %>%  
+  inner_join(sentiments) %>% 
+  count(actor, word, sentiment, sort = T) %>% 
+  ungroup() %>% 
+  group_by(actor, sentiment) %>% 
+  top_n(5, wt = n) %>% 
+  ungroup() %>% 
+  mutate(n = ifelse(sentiment == 'positive', n, -n)) %>% 
+  mutate(actor = as.factor(actor),
+         word = reorder_within(word, n, actor)) %>% 
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = F, alpha = 0.9) +
+  scale_fill_manual(values = bb_pal) +
+  labs(title = 'Frequency of most used positive and negative words by characters using Bing',
+       x = NULL, y = NULL) +
+  coord_flip() +
+  scale_x_reordered() +
+  facet_wrap(~actor, scales = 'free') +
+  theme_classic()
+
+
+
+```
+
+
+I also used BING lexicon to check over all sentiment of each season for both characters. The first cord diagram below is for Walter and appears that the use of more negative words is increasing as we move from Season 1 to Season 2. One might question that since we have data for only half of the series and the amount of episodes in the Season 2 are more than compared to Season 1, thus the results are not conclusive. But when you observe closely, the weight of negative sentiments is higher compared to the weight positive sentiments is Season 2. On the hand, the in Season 1 the wights of sentiment are quite close to each other. Thus, based on these, we can say that character of Walter is becoming more negative as the show progresses. 
+
+
+
+```{r, echo=F, message=F, warning=F, fig.align='center'}
+
+# Walter Cord Diagram by Season
+
+to_plot <- tokens %>% 
+  filter(actor == "Walter") %>% 
+  # get 'bing' and filter the data
+  inner_join(get_sentiments('bing'), "word") %>% 
+  
+  # sum number of words per sentiment and character
+  count(sentiment, season) %>% 
+  group_by(season, sentiment) %>% 
+  summarise(sentiment_sum = sum(n)) %>% 
+  ungroup()
+
+# The Chord Diagram  - Walter
+circos.clear()
+circos.par(gap.after = c(rep(2, length(unique(to_plot[[1]])) - 1), 15,
+                         rep(2, length(unique(to_plot[[2]])) - 1), 15), gap.degree=2)
+
+myColors = c("Season 1" = "#0D3E10", "Season 2" = "gold3", "Season 3" =  "black", "positive" = "#D7DBDD", "negative" = "#D7DBDD")
+
+chordDiagram(to_plot, grid.col = myColors, transparency = 0.2, annotationTrack = c("name", "grid"),
+             annotationTrackHeight = c(0.01, 0.02),
+title("Relationship between Sentiment and Seasons for Walter"))
+
+
+
+
+
+```
+
+When we look at the character of Jesse, based on cord diagram below, it appears that results far the assumption we made in the hypothesis. We believed that the character of Jesse becomes more docile as the show progresses, but as per the results in fact the character increase the weight of negative sentiments as the show progresses. In this situation, we do need more data to understand the actual change in sentiment for the character of Jesse. But now the less BING lexicon did produce promising results. 
+
+```{r, echo=F, message=F, warning=F, fig.align='center'}
+# Jesse Cord Diagram by Season
+
+to_plot_1 <- tokens %>% 
+  filter(actor == "Jesse") %>% 
+  # get 'bing' and filter the data
+  inner_join(get_sentiments('bing'), "word") %>% 
+  
+  # sum number of words per sentiment and character
+  count(sentiment, season) %>% 
+  group_by(season, sentiment) %>% 
+  summarise(sentiment_sum = sum(n)) %>% 
+  ungroup()
+
+# The Chord Diagram - Jesse 
+circos.clear()
+circos.par(gap.after = c(rep(2, length(unique(to_plot_1[[1]])) - 1), 15,
+                         rep(2, length(unique(to_plot_1[[2]])) - 1), 15), gap.degree=2)
+
+
+chordDiagram(to_plot_1, grid.col = myColors, transparency = 0.2, annotationTrack = c("name", "grid"),
+             annotationTrackHeight = c(0.01, 0.02),
+title("Relationship between Sentiment and Seasons for Jesse"))
+```
+
+
+## NFC Lexicon
+
+The next approach to understand character development of Walter and Jesse we will use NRC Lexicon. The NRC Lexicon categorizes the words in 10 moods:
+
+- Positive
+- Negative
+- Anger
+- Anticipation
+- Disgust
+- Fear
+- Joy
+- Sadness
+- Surprise
+- Trust
+
+The NRC dataset used for this analysis was published in Saif M. Mohammad and Peter Turney. (2013), "Crowdsourcing a Word-Emotion Association Lexicon -  Computational Intelligence". You will need to download it in order to use it. First you will need to first download library "textdata" and when you run the code used to get nrc sentiment it will automatically ask you to download it. 
+
+Now Let's look at how these sentiments ranks fit in our data. First we look at the overall mood of the character. As you can from the graph below we get a basic idea about the frequency of each for the characters up until now in the series, but lets dig a little deeper. 
+
+```{r, echo=F, message=F, warning=F, fig.width=8, fig.height = 6, fig.align="center"}
+nrc_sentiments <- tokens %>% 
+  inner_join(get_sentiments('nrc'), "word") %>%
+  count(sentiment, sort=T)
+
+#nrc_sentiments
+
+tokens %>% 
+  # Data:
+  inner_join(get_sentiments('nrc'), "word") %>% 
+  count(actor, sentiment, sort=T) %>% 
+  
+  # Plot:
+  ggplot(aes(x=sentiment, y=n)) +
+  geom_col(aes(fill=sentiment), show.legend = F) +
+  scale_fill_manual(values = w_pal) +
+  facet_wrap(~actor, scales="free_x") +
+  labs(x="Sentiment", y="Frequency", title="Walter and Jesse's Moods Analysis") +
+  coord_flip() +
+  theme_classic() 
+
+```
+
+To understand how these emotions and moods change as the season progress, I crated radar charts for each season. The radar chart below for "Walter", even with the limited data, reveals few signs of change in character. If you observe closely, you can see that moods such as sadness, fear and disgust have dropped in season 2 compared to season 1. Similarly, moods such as joy and trust have improved in season 2. If you are familiar with the series, you would know that Walter tends to be more depressed and not so confident with the illegal business he starts involving himself with. But in Season 2 we see that this business of cooking meth becomes more of routine for him and he kind's starts to taking matters in his own hands with fear of what others might do. This these facts points towards a gradual negative change in personality, which is also what we have trying to look for. 
+
+```{r, echo=F, message=F, warning=F, fig.align='center'}
+# Table with Character, sentiment and word count
+char_sentiment_w <- tokens %>% 
+  inner_join(get_sentiments('nrc'), "word") %>% 
+  filter(actor == "Walter"
+         & !sentiment %in% c("positive","negative")) %>% 
+  group_by(season, sentiment) %>% 
+  count(season, sentiment) %>% 
+  select(season, sentiment, char_sentiment_count=n)
+
+# Total Count of sentiments per Character
+total_season_w <- tokens %>% 
+  inner_join(get_sentiments('nrc'), "word") %>% 
+  filter(actor == "Walter"
+         & !sentiment %in% c("positive","negative")) %>% 
+  count(season) %>% 
+  select(season, total=n)
+
+
+# Radar Chart:
+#char_sentiment_w %>% 
+#  inner_join(total_season_w, by="season") %>% 
+#  mutate(percent = char_sentiment_count / total * 100 ) %>% 
+#  select(-char_sentiment_count, -total) %>% 
+#  spread(season, percent) %>% 
+#  chartJSRadar(showToolTipLabel = T, main="Walter's Season Sentiment Radar", maxScale=22, responsive=T,
+#               addDots = T, 
+#               colMatrix = grDevices::col2rgb(c("#0D3E10","gold3","black")),
+#               lineAlpha = 0.7, polyAlpha = 0.05)
+
+
+
+# Table with Character, sentiment and word count
+char_sentiment_j <- tokens %>% 
+  inner_join(get_sentiments('nrc'), "word") %>% 
+  filter(actor == "Jesse"
+         & !sentiment %in% c("positive","negative")) %>% 
+  group_by(season, sentiment) %>% 
+  count(season, sentiment) %>% 
+  select(season, sentiment, char_sentiment_count=n)
+
+# Total Count of sentiments per Character
+total_season_j <- tokens %>% 
+  inner_join(get_sentiments('nrc'), "word") %>% 
+  filter(actor == "Jesse"
+         & !sentiment %in% c("positive","negative")) %>% 
+  count(season) %>% 
+  select(season, total=n)
+
+
+# Radar Chart:
+#char_sentiment_j %>% 
+#  inner_join(total_season_j, by="season") %>% 
+#  mutate(percent = char_sentiment_count / total * 100 ) %>% 
+#  select(-char_sentiment_count, -total) %>% 
+#  spread(season, percent) %>% 
+#  chartJSRadar(showToolTipLabel = T, main="Jesse's Season Sentiment Radar", maxScale=22, responsive=T,
+#               addDots = T, 
+#               colMatrix = grDevices::col2rgb(c("#0D3E10","gold3","black")),
+#               lineAlpha = 0.7, polyAlpha = 0.05)
+
+
+
+
+image_read("~/DS3_NLP_BreakingBad_Analysis/Data/web_w.png")
+
+
+```
+
+
+On the other hand, if you observe the radar graph for Jesse provided below, you can see signs of changes in personality. But in Jesse's case the changes in mood suggest that his character indeed is getting a bit positive overall. The anger levels appear to reducing, while trust emotions tend to be improving. Thus, based on this we can say that Jesse's character is getting a bit more sensitive and docile. 
+
+```{r, echo=F, message=F, warning=F, fig.align='center'}
+image_read("~/DS3_NLP_BreakingBad_Analysis/Data/web_j.png")
+
+```
+
+
+## AFINN Lexicon
+
+The sentiment analysis will be perfomed using Afinn Lexicon. It is similar to BING Lexicon, but Afinn Lexicon ranks every word from -5 to 5, where:
+
+- -5 being the most negative
+- +5 being the most positive
+
+For this sentiment model, we will be only looking at Season 1 and Season 2, since comparing those is much easier and we have very less data on Season 3. First we look at how Walter's character performed against Afinn ranking. From the charted provide below, unfortunately we don't get much insight since the ratio of positive to negative sentiments is similar in both the seasons, therefore in case of Walter Afinn provided us with more neutral result which doesn't help understanding if the character is becoming more negative. 
+
+```{r, echo=F, message=F, warning=F, out.width="50%"}
+
+# Walter's Afinn sentiments by seasons 
+
+tokens %>% 
+  filter( actor == "Walter" & season == "Season 1") %>% 
+  inner_join(get_sentiments('afinn'), "word") %>% 
+  group_by(index = episode) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "Afinn_1") %>% 
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(fill = '#0D3E10', alpha = 0.9, show.legend = F) +
+  labs(title = "Walter's Afinn Sentiment Season 1", x = "Episode") +
+  theme_classic()
+
+tokens %>% 
+  filter( actor == "Walter" & season == "Season 2") %>% 
+  inner_join(get_sentiments('afinn'), "word") %>% 
+  group_by(index = episode) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "Afinn_2") %>% 
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(fill = "gold3", alpha = 0.9, show.legend = F) +
+  labs(title = "Walter's Afinn Sentiment Season 2", x = "Episode") +
+  theme_classic()
+
+
+
+```
+Again, when I used Afinn to understand the trend of Jesse's character, it did not produce any conclusive results. In fact, Afinn result summarize Jesse's character more negative then the two sentiment techniques we previously used. 
+
+```{r, echo=F, message=F, warning=F, out.width="50%"}
+
+# Jesse's Afinn sentiments by seasons 
+
+tokens %>% 
+  filter( actor == "Jesse" & season == "Season 1") %>% 
+  inner_join(get_sentiments('afinn'), "word") %>% 
+  group_by(index = episode) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "Afinn_1") %>% 
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(fill = '#0D3E10', alpha = 0.9, show.legend = F) +
+  labs(title = "Jesse's Afinn Sentiment Season 1", x = "Episode") +
+  theme_classic()
+
+tokens %>% 
+  filter( actor == "Jesse" & season == "Season 2") %>% 
+  inner_join(get_sentiments('afinn'), "word") %>% 
+  group_by(index = episode) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "Afinn_2") %>% 
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(fill = "gold3", alpha = 0.9, show.legend = F) +
+  labs(title = "Jesse's Afinn Sentiment Season 2", x = "Episode") +
+  theme_classic()
+
+
+
+```
+
+
+
+
+# Topic Modeling
+
+
+In this section we will briefly explore unique topics and models associated to Walter and Jesse and if these topics change as the show progresses. I used an LDA model and made it to find 5 groups/vocabularies for each season. It is very intriguing to see that the model performed pretty good in associating a theme for both the character as the show progresses. 
+
+Below you can see the topic spread by seasons for Walter. It appears that this character's theme changes to completely one or more new themes. This is in some way is also validating that the possible changes in character's personality. Overall, we see that in every season Walter had a very strong association to one of the 5 top clusters.  
+```{r, echo=F, message=F, warning=F, fig.align='center', out.width="70%"}
+top_words_w <- tokens %>% 
+  filter(actor == "Walter") %>% 
+  group_by(season) %>% 
+  unnest_tokens(word, text) %>% 
+  ungroup() %>% 
+  select(season, word) %>% 
+  mutate(word = lemmatize_words(word)) %>% 
+  anti_join(stopwords_script) %>% 
+  count(season, word, sort = T) %>% 
+  ungroup()
+
+top_words_dtm_w <- top_words_w %>% cast_dtm(season, word, n)
+
+top_words_dtm_lda_w <- top_words_dtm_w %>% LDA(k = 5, control = list(seed = 8080))
+
+top_words_dtm_lda_gammas_w <- tidy(top_words_dtm_lda_w, matrix = 'gamma')
+
+top_words_dtm_lda_gammas_w %>%  
+  rename('season' = 'document') %>% 
+  mutate(topic = as.factor(topic)) %>% 
+  ggplot(aes(topic, gamma, fill = season)) + 
+  geom_point(show.legend = F) +
+  facet_wrap(~season, scales = 'free') + 
+  labs(title = "Really significant differences in vocabulary used by Walter",
+       x = '5 topics (clusters) from LDA algo',
+       y = '% of being assigned to one cluster') +
+  theme_light()
+
+```
+
+
+For Jesse, as per the chart below, we can observe that in season 2 there were a total of 3 topics, while in both the other seasons there was only one dominant theme. This again points towards the positive shift in personality we have been trying to highlight throughout this exercise. 
+
+
+```{r, echo=F, message=F, warning=F, fig.align='center'}
+top_words_j <- tokens %>% 
+  filter(actor == "Jesse") %>% 
+  group_by(season) %>% 
+  unnest_tokens(word, text) %>% 
+  ungroup() %>% 
+  select(season, word) %>% 
+  mutate(word = lemmatize_words(word)) %>% 
+  anti_join(stopwords_script) %>% 
+  count(season, word, sort = T) %>% 
+  ungroup()
+
+top_words_dtm_j <- top_words_j %>% cast_dtm(season, word, n)
+
+top_words_dtm_lda_j <- top_words_dtm_j %>% LDA(k = 5, control = list(seed = 8080))
+
+top_words_dtm_lda_gammas_j <- tidy(top_words_dtm_lda_j, matrix = 'gamma')
+
+top_words_dtm_lda_gammas_j %>%  
+  rename('season' = 'document') %>% 
+  mutate(topic = as.factor(topic)) %>% 
+  ggplot(aes(topic, gamma, fill = season)) + 
+  geom_point(show.legend = F) +
+  facet_wrap(~season, scales = 'free') + 
+  labs(title = "Really significant differences in vocabulary used by Walter",
+       x = '5 topics (clusters) from LDA algo',
+       y = '% of being assigned to one cluster') +
+  theme_light()
+
+```
+
+
+I wanted to understand what these topics are so I decide to look at most frequent words in the clusters for both Walter and Jesse. Based on the graphs provided below for Walter and Jesse, the words used in the cluster are quite similar to what we initially saw as positive or negative word for each of these characters. Therefore, we can say that using LDA we did get a basic understanding that topic association to both the character does change as the show progresses. 
+
+
+```{r, echo=F, message=F, warning=F, fig.align='center'}
+top_words_dtm_lda_w %>% 
+  tidy() %>% 
+  group_by(topic) %>% 
+  top_n(10, beta) %>% 
+  ungroup() %>% 
+  mutate(term = reorder(term, beta)) %>% 
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = w_pal) +
+  facet_wrap(~topic, scales = "free_y") +
+  coord_flip() +
+  labs(title = "Topic Clusters for Walter") +
+  theme_classic()
+  
+```
+
+```{r, echo=F, message=F, warning=F, fig.align='center'}
+top_words_dtm_lda_j %>% 
+  tidy() %>% 
+  group_by(topic) %>% 
+  top_n(10, beta) %>% 
+  ungroup() %>% 
+  mutate(term = reorder(term, beta)) %>% 
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = F) +
+  scale_fill_manual(values = w_pal) +
+  facet_wrap(~topic, scales = "free_y") +
+  coord_flip() +
+  labs(title = "Topic Clusters for Jesse") +
+  theme_classic()
+```
+
+
+
+# Conclusion
+
+Overall, I would say that these NLP tools are indeed very powerful and in the case of this analysis they have performed better than my exception, even for this small project with incomplete data. Yes, having more data always help, but we can not say that the analysis performed above didn't provide any meaningful insight. We were able to explore and understand both the hypothesis in depth and to some extent the hypothesis are correct because the results do suggest changes in personality of the characters as the show progresses.  
+
+
+
+```{r, echo=F, message=F, warning=F, fig.width=12, fig.height = 6, fig.align="center"}
+image_read("~/DS3_NLP_BreakingBad_Analysis/Data/bb_cover.png")
+```
